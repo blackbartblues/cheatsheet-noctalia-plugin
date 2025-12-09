@@ -23,8 +23,8 @@ ColumnLayout {
         spacing: Style.marginS
 
         NLabel {
-            label: "Minimum CPU Threshold"
-            description: "CPU usage must be above this percentage for the cat to start running"
+            label: pluginApi?.tr("settings.minimumThreshold.label") || "Minimum CPU Threshold"
+            description: pluginApi?.tr("settings.minimumThreshold.description") || "CPU usage must be above this percentage for the cat to start running"
         }
 
         NSlider {
@@ -39,7 +39,7 @@ ColumnLayout {
         }
 
         Text {
-            text: "Current threshold: " + thresholdSlider.value + "%"
+            text: (pluginApi?.tr("settings.currentThreshold") || "Current threshold: {value}%").replace("{value}", thresholdSlider.value)
             color: Color.mOnSurfaceVariant
             font.pointSize: Style.fontSizeS
         }

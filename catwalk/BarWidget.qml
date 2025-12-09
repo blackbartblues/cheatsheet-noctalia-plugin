@@ -10,7 +10,6 @@ import qs.Services.System
 Rectangle {
     id: root
 
-    // --- NIconButton Properties (Copied & Adapted) ---
     property real baseSize: Style.capsuleHeight
     property bool applyUiScale: false
 
@@ -124,9 +123,9 @@ Rectangle {
         width: {
             switch (root.density) {
             case "compact":
-                return Math.max(1, root.width * 0.85); // Increased size
+                return Math.max(1, root.width * 0.85);
             default:
-                return Math.max(1, root.width * 0.85); // Increased size
+                return Math.max(1, root.width * 0.85);
             }
         }
         height: width

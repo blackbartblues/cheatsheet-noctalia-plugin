@@ -112,8 +112,8 @@ Rectangle {
   }
 
   readonly property string tooltipText: {
-    if (enabledTimezones.length === 0) return I18n.tr("world-clock.configure");
-    return `${currentCity}\n${currentTime}\n${I18n.tr("world-clock.tooltip.click")}`;
+    if (enabledTimezones.length === 0) return pluginApi?.tr("world-clock.configure") || "Configure timezones";
+    return `${currentCity}\n${currentTime}\n${pluginApi?.tr("world-clock.tooltip.click") || "Click to configure"}`;
   }
 
   RowLayout {

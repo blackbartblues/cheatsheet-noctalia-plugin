@@ -7,6 +7,7 @@
   "license": "MIT",
   "repository": "",
   "description": "A simple note taking plugin for Noctalia Shell.",
+  "tags": ["Bar", "Panel", "Productivity"],
   "entryPoints": {
     "main": "Main.qml",
     "barWidget": "BarWidget.qml",

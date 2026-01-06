@@ -418,7 +418,7 @@ Item {
 
                     NIconButton {
                       icon: "pencil"
-                      tooltipText: pluginApi?.tr("steam-price-watcher.edit") || "Editar"
+                      tooltipText: pluginApi?.tr("steam-price-watcher.edit-price") || "Edit"
                       baseSize: Style.baseWidgetSize * 0.7
                       colorBg: Color.mSurface
                       colorFg: Color.mOnSurface
@@ -513,10 +513,13 @@ Item {
                         text: {
                           if (modelData.currentPrice <= modelData.targetPrice) {
                             var saved = ((modelData.targetPrice - modelData.currentPrice) / modelData.targetPrice * 100).toFixed(0)
-                            return saved > 0 ? `↓ ${saved}% do alvo` : "✓ Alvo atingido"
+                            var belowText = pluginApi?.tr("steam-price-watcher.below-target") || "below target";
+                            var targetReachedText = pluginApi?.tr("steam-price-watcher.target-reached") || "✓ Target reached";
+                            return saved > 0 ? `↓ ${saved}% ${belowText}` : targetReachedText
                           } else {
                             var above = ((modelData.currentPrice - modelData.targetPrice) / modelData.targetPrice * 100).toFixed(0)
-                            return `↑ ${above}% acima`
+                            var aboveText = pluginApi?.tr("steam-price-watcher.above-target") || "above";
+                            return `↑ ${above}% ${aboveText}`
                           }
                         }
                         color: modelData.currentPrice <= modelData.targetPrice ? 
@@ -547,25 +550,6 @@ Item {
                   }
 
                   Item { Layout.fillWidth: true }
-                }
-              }
-
-              // Action buttons
-              ColumnLayout {
-                spacing: Style.marginS
-
-                NIconButton {
-                  icon: "edit"
-                  tooltipText: pluginApi?.tr("steam-price-watcher.edit-price") || "Editar preço"
-                  baseSize: Style.baseWidgetSize * 0.8
-                  onClicked: editPriceDialog.open(modelData)
-                }
-
-                NIconButton {
-                  icon: "delete"
-                  tooltipText: pluginApi?.tr("steam-price-watcher.remove") || "Remover"
-                  baseSize: Style.baseWidgetSize * 0.8
-                  onClicked: removeGame(modelData.appId)
                 }
               }
             }

@@ -19,8 +19,5 @@
         "defaultSettings": {
             "mode": "region"
         }
-    },
-    "dependencies": {
-        "plugins": []
     }
 }

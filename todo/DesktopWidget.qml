@@ -9,7 +9,7 @@ DraggableDesktopWidget {
   id: root
 
   property var pluginApi: null
-  property bool expanded: false
+  property bool expanded: pluginApi?.pluginSettings?.isExpanded !== undefined ? pluginApi.pluginSettings.isExpanded : (pluginApi?.manifest?.metadata?.defaultSettings?.isExpanded || false)
   property bool showCompleted: pluginApi?.pluginSettings?.showCompleted !== undefined ? pluginApi.pluginSettings.showCompleted : pluginApi?.manifest?.metadata?.defaultSettings?.showCompleted
   property ListModel filteredTodosModel: ListModel {}
 
@@ -175,6 +175,10 @@ DraggableDesktopWidget {
         anchors.fill: parent
         onClicked: {
           root.expanded = !root.expanded;
+          if (pluginApi) {
+            pluginApi.pluginSettings.isExpanded = root.expanded;
+            pluginApi.saveSettings();
+          }
         }
       }
 

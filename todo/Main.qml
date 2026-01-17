@@ -23,11 +23,15 @@ Item {
         pluginApi.pluginSettings.completedCount = 0;
       }
 
+      if (pluginApi.pluginSettings.isExpanded === undefined) {
+        pluginApi.pluginSettings.isExpanded = false;
+      }
+
       // Ensure all existing todos have a pageId
       var todos = pluginApi.pluginSettings.todos;
       for (var i = 0; i < todos.length; i++) {
         if (todos[i].pageId === undefined) {
-          todos[i].pageId = 0; // Assign to default page
+          todos[i].pageId = 0;
         }
       }
 

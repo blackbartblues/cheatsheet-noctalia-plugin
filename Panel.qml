@@ -2,18 +2,30 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import qs.Commons
+import qs.Services.UI
 import qs.Widgets
 
 Item {
   id: root
   property var pluginApi: null
+
+  // Settings
+  property var cfg: pluginApi?.pluginSettings || ({})
+  property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
+
+  // Settings values
+  property int settingsWidth: cfg.windowWidth ?? defaults.windowWidth ?? 1400
+  property int settingsHeight: cfg.windowHeight ?? defaults.windowHeight ?? 0
+  property bool autoHeight: cfg.autoHeight ?? defaults.autoHeight ?? true
+  property int columnCount: cfg.columnCount ?? defaults.columnCount ?? 3
+
   property var rawCategories: pluginApi?.pluginSettings?.cheatsheetData || []
   property var categories: processCategories(rawCategories)
-  property var column0Items: []
-  property var column1Items: []
-  property var column2Items: []
+  property string compositor: pluginApi?.pluginSettings?.detectedCompositor || ""
+
+  // Dynamic column items (up to 4 columns)
+  property var columnItems: []
 
   onRawCategoriesChanged: {
     categories = processCategories(rawCategories);
@@ -22,105 +34,90 @@ Item {
 
   onCategoriesChanged: {
     updateColumnItems();
+    contentPreferredHeight = calculateDynamicHeight();
+  }
+
+  onColumnCountChanged: {
+    updateColumnItems();
+    contentPreferredHeight = calculateDynamicHeight();
+  }
+
+  onPanelOpenScreenChanged: {
+    // Recalculate height when screen becomes available (important for bar widget opening)
+    contentPreferredHeight = calculateDynamicHeight();
+  }
+
+  onMaxScreenHeightChanged: {
+    contentPreferredHeight = calculateDynamicHeight();
   }
 
   function updateColumnItems() {
     var assignments = distributeCategories();
-    column0Items = buildColumnItems(assignments[0]);
-    column1Items = buildColumnItems(assignments[1]);
-    column2Items = buildColumnItems(assignments[2]);
+    var items = [];
+    for (var i = 0; i < columnCount; i++) {
+      items.push(buildColumnItems(assignments[i] || []));
+    }
+    columnItems = items;
   }
-  property real contentPreferredWidth: 1400
-  property real contentPreferredHeight: 850
+
+  // Screen height limit (90% of screen)
+  property var panelOpenScreen: pluginApi?.panelOpenScreen
+  property real maxScreenHeight: panelOpenScreen ? panelOpenScreen.height * 0.9 : 800
+
+  property real contentPreferredWidth: settingsWidth
+  property real contentPreferredHeight: calculateDynamicHeight()
   readonly property var geometryPlaceholder: panelContainer
-  readonly property bool allowAttach: false 
+  readonly property bool allowAttach: false
   readonly property bool panelAnchorHorizontalCenter: true
   readonly property bool panelAnchorVerticalCenter: true
   anchors.fill: parent
-  property var allLines: []
-  property bool isLoading: false
-  
-  onPluginApiChanged: { if (pluginApi) checkAndGenerate(); }
-  Component.onCompleted: { if (pluginApi) checkAndGenerate(); }
 
-  function checkAndGenerate() {
-      if (root.rawCategories.length === 0) {
-          isLoading = true;
-          allLines = [];
-          catProcess.running = true;
+  // Data is loaded by Main.qml, we just display it
+  property bool isLoading: rawCategories.length === 0
+
+  function calculateDynamicHeight() {
+    // If auto height is disabled, use manual height (but still respect screen limit)
+    if (!autoHeight && settingsHeight > 0) {
+      return Math.min(settingsHeight, maxScreenHeight);
+    }
+
+    if (categories.length === 0) return Math.min(400, maxScreenHeight);
+
+    var assignments = distributeCategories();
+    var maxColumnHeight = 0;
+
+    for (var col = 0; col < columnCount; col++) {
+      var colHeight = 0;
+      var catIndices = assignments[col] || [];
+
+      for (var i = 0; i < catIndices.length; i++) {
+        var catIndex = catIndices[i];
+        if (catIndex >= categories.length) continue;
+
+        var cat = categories[catIndex];
+        colHeight += 26; // Header
+        colHeight += cat.binds.length * 20; // Binds
+        if (i < catIndices.length - 1) {
+          colHeight += 6; // Spacer
+        }
       }
+
+      if (colHeight > maxColumnHeight) {
+        maxColumnHeight = colHeight;
+      }
+    }
+
+    // header (45) + content + margins (16)
+    var totalHeight = 45 + maxColumnHeight + 16 + 15 + 15;
+    // Limit to 80% of screen height
+    return Math.max(300, Math.min(totalHeight, maxScreenHeight));
   }
 
-  Process {
-      id: catProcess
-      command: ["sh", "-c", "cat ~/.config/hypr/keybind.conf"]
-      running: false
-      
-      stdout: SplitParser {
-          onRead: data => {
-              root.allLines.push(data);
-          }
-      }
-      
-      onExited: (exitCode, exitStatus) => {
-          isLoading = false;
-          if (exitCode === 0 && root.allLines.length > 0) {
-              var fullContent = root.allLines.join("\n");
-              parseAndSave(fullContent);
-              root.allLines = [];
-          } else {
-              errorText.text = pluginApi?.tr("panel.error_read_file") || "File read error";
-              errorView.visible = true;
-          }
-      }
-  }
-
-  function parseAndSave(text) {
-      var lines = text.split('\n');
-      var cats = [];
-      var currentCat = null;
-
-      for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
-          if (line.startsWith("#") && line.match(/#\s*\d+\./)) {
-              if (currentCat) cats.push(currentCat);
-              var title = line.replace(/#\s*\d+\.\s*/, "").trim();
-              currentCat = { "title": title, "binds": [] };
-          } 
-          else if (line.includes("bind") && line.includes('#"')) {
-              if (currentCat) {
-                  var descMatch = line.match(/#"(.*?)"$/);
-                  var desc = descMatch ? descMatch[1] : (pluginApi?.tr("panel.no_description") || "No description");
-                  var parts = line.split(',');
-                  if (parts.length >= 2) {
-                      var bindPart = parts[0].trim();
-                      var keyPart = parts[1].trim();
-                      var mod = "";
-                      if (bindPart.includes("$mod")) mod = "Super";
-                      if (bindPart.includes("SHIFT")) mod += (mod ? " + Shift" : "Shift");
-                      if (bindPart.includes("CTRL")) mod += (mod ? " + Ctrl" : "Ctrl");
-                      if (bindPart.includes("ALT")) mod += (mod ? " + Alt" : "Alt");
-                      var key = keyPart.toUpperCase();
-                      var fullKey = mod + (mod && key ? " + " : "") + key;
-                      currentCat.binds.push({ "keys": fullKey, "desc": desc });
-                  }
-              }
-          }
-      }
-      if (currentCat) cats.push(currentCat);
-      if (cats.length > 0) {
-          pluginApi.pluginSettings.cheatsheetData = cats;
-          pluginApi.saveSettings();
-      } else {
-          errorText.text = pluginApi?.tr("panel.no_categories") || "No categories found";
-          errorView.visible = true;
-      }
-  }
-
+  // ========== UI ==========
   Rectangle {
     id: panelContainer
     anchors.fill: parent
-    color: Color.mSurface 
+    color: Color.mSurface
     radius: Style.radiusL
     clip: true
 
@@ -132,143 +129,125 @@ Item {
       height: 45
       color: Color.mSurfaceVariant
       radius: Style.radiusL
-      
+
       RowLayout {
-        anchors.centerIn: parent
+        anchors.fill: parent
+        anchors.leftMargin: Style.marginM
+        anchors.rightMargin: Style.marginM
         spacing: Style.marginS
+
+        // Title section (centered)
+        Item { Layout.fillWidth: true }
+
         NIcon {
           icon: "keyboard"
           pointSize: Style.fontSizeM
           color: Color.mPrimary
         }
         NText {
-          text: pluginApi?.tr("panel.title") || "Cheat Sheet"
+          text: {
+            var title = "Keybind Cheatsheet";
+            if (root.compositor) {
+              title += " (" + root.compositor.charAt(0).toUpperCase() + root.compositor.slice(1) + ")";
+            }
+            return title;
+          }
           font.pointSize: Style.fontSizeM
           font.weight: Font.Bold
           color: Color.mPrimary
+        }
+
+        Item { Layout.fillWidth: true }
+
+        // Settings button in corner
+        NIconButton {
+          icon: "settings"
+          onClicked: {
+            var screen = pluginApi?.panelOpenScreen;
+            if (screen && pluginApi?.manifest) {
+              BarService.openPluginSettings(screen, pluginApi.manifest);
+            }
+          }
         }
       }
     }
 
     NText {
-        id: loadingText
-        anchors.centerIn: parent
-        text: pluginApi?.tr("panel.loading") || "Loading..."
-        visible: root.isLoading
-        font.pointSize: Style.fontSizeL
-        color: Color.mOnSurface
+      id: loadingText
+      anchors.centerIn: parent
+      text: pluginApi?.tr("keybind-cheatsheet.panel.loading") || "Loading..."
+      visible: root.isLoading
+      font.pointSize: Style.fontSizeL
+      color: Color.mOnSurface
     }
 
-    ColumnLayout {
-        id: errorView
-        anchors.centerIn: parent
-        visible: false
-        spacing: Style.marginM
-        NIcon {
-            icon: "alert-circle"
-            pointSize: 48
-            Layout.alignment: Qt.AlignHCenter
-            color: Color.mError
-        }
-        NText {
-            id: errorText
-            text: pluginApi?.tr("panel.no_data") || "No data"
-            font.pointSize: Style.fontSizeM
-            color: Color.mOnSurface
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-        }
-        NButton {
-            text: pluginApi?.tr("panel.refresh_button") || "Refresh"
-            Layout.alignment: Qt.AlignHCenter
-            onClicked: {
-                pluginApi.pluginSettings.cheatsheetData = [];
-                pluginApi.saveSettings();
-                checkAndGenerate();
-            }
-        }
-    }
-
-    RowLayout {
-      id: mainLayout
+    NScrollView {
+      id: scrollView
       visible: root.categories.length > 0 && !root.isLoading
       anchors.top: header.bottom
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.margins: Style.marginM
-      spacing: Style.marginS
-      
-      ColumnLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        Layout.alignment: Qt.AlignTop
-        spacing: 2
+      clip: true
+      leftPadding: 35
+      rightPadding: -10
+      topPadding: 15
+      bottomPadding: 15
+
+      RowLayout {
+        id: mainLayout
+        width: scrollView.availableWidth - Style.marginS  
+        spacing: Style.marginS
+
         Repeater {
-          model: root.column0Items
-          Loader {
+          model: root.columnItems.length
+
+          ColumnLayout {
             Layout.fillWidth: true
-            sourceComponent: modelData.type === "header" ? headerComponent :
-                           (modelData.type === "spacer" ? spacerComponent : bindComponent)
-            property var itemData: modelData
-          }
-        }
-      }
-      
-      ColumnLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        Layout.alignment: Qt.AlignTop
-        spacing: 2
-        Repeater {
-          model: root.column1Items
-          Loader {
-            Layout.fillWidth: true
-            sourceComponent: modelData.type === "header" ? headerComponent :
-                           (modelData.type === "spacer" ? spacerComponent : bindComponent)
-            property var itemData: modelData
-          }
-        }
-      }
-      
-      ColumnLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        Layout.alignment: Qt.AlignTop
-        spacing: 2
-        Repeater {
-          model: root.column2Items
-          Loader {
-            Layout.fillWidth: true
-            sourceComponent: modelData.type === "header" ? headerComponent :
-                           (modelData.type === "spacer" ? spacerComponent : bindComponent)
-            property var itemData: modelData
+            Layout.alignment: Qt.AlignTop
+            spacing: 2
+
+            property var colItems: root.columnItems[index] || []
+
+            Repeater {
+              model: colItems
+              Loader {
+                Layout.fillWidth: true
+                sourceComponent: modelData.type === "header" ? headerComponent :
+                               (modelData.type === "spacer" ? spacerComponent : bindComponent)
+                property var itemData: modelData
+              }
+            }
           }
         }
       }
     }
   }
-  
+
   Component {
     id: headerComponent
-    RowLayout {
-      spacing: Style.marginXS
+    ColumnLayout {  
+      Layout.preferredWidth: 300      
       Layout.topMargin: Style.marginM
       Layout.bottomMargin: 4
-      NIcon {
-        icon: "circle-dot"
-        pointSize: 10
-        color: Color.mPrimary
-      }
+      spacing: 0
+  
+      Item { Layout.fillWidth: true; height: 1 }  
+  
       NText {
+        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter  
+        x: parent.width - implicitWidth             
         text: itemData.title
         font.pointSize: 11
         font.weight: Font.Bold
         color: Color.mPrimary
       }
+  
+      Item { Layout.fillWidth: true; height: 1 }  
     }
   }
-  
+ 
+
   Component {
     id: spacerComponent
     Item {
@@ -276,7 +255,7 @@ Item {
       Layout.fillWidth: true
     }
   }
-  
+
   Component {
     id: bindComponent
     RowLayout {
@@ -315,18 +294,16 @@ Item {
       }
     }
   }
-  
+
   function getKeyColor(keyName) {
-    // Różne kolory dla różnych typów klawiszy
     if (keyName === "Super") return Color.mPrimary;
     if (keyName === "Ctrl") return Color.mSecondary;
     if (keyName === "Shift") return Color.mTertiary;
-    if (keyName === "Alt") return "#FF6B6B"; // Czerwonawy
-    if (keyName.startsWith("XF86")) return "#4ECDC4"; // Turkusowy dla multimediów
-    if (keyName === "PRINT") return "#95E1D3"; // Jasny turkus dla print screen
-    if (keyName.match(/^[0-9]$/)) return "#A8DADC"; // Jasnoniebieski dla cyfr
-    if (keyName.includes("MOUSE")) return "#F38181"; // Różowy dla myszy
-    // Domyślny kolor dla innych klawiszy (litery, strzałki, itp.)
+    if (keyName === "Alt") return "#FF6B6B";
+    if (keyName.startsWith("XF86")) return "#4ECDC4";
+    if (keyName === "PRINT" || keyName === "Print") return "#95E1D3";
+    if (keyName.match(/^[0-9]$/)) return "#A8DADC";
+    if (keyName.includes("MOUSE") || keyName.includes("Wheel")) return "#F38181";
     return Color.mPrimaryContainer || "#6C757D";
   }
 
@@ -339,9 +316,7 @@ Item {
       if (catIndex >= categories.length) continue;
 
       var cat = categories[catIndex];
-      // Dodaj nagłówek
       result.push({ type: "header", title: cat.title });
-      // Dodaj wszystkie bindy
       for (var j = 0; j < cat.binds.length; j++) {
         result.push({
           type: "bind",
@@ -349,7 +324,6 @@ Item {
           desc: cat.binds[j].desc
         });
       }
-      // Dodaj spacer po kategorii (oprócz ostatniej w kolumnie)
       if (i < categoryIndices.length - 1) {
         result.push({ type: "spacer" });
       }
@@ -360,77 +334,76 @@ Item {
   function processCategories(cats) {
     if (!cats || cats.length === 0) return [];
 
-    var result = [];
-    for (var i = 0; i < cats.length; i++) {
-      var cat = cats[i];
+    // For Hyprland: split large workspace categories
+    if (compositor === "hyprland") {
+      var result = [];
+      for (var i = 0; i < cats.length; i++) {
+        var cat = cats[i];
 
-      // Podziel duże kategorie (>12 itemów)
-      if (cat.binds && cat.binds.length > 12 && cat.title.includes("OBSZARY ROBOCZE")) {
-        var switching = [];
-        var moving = [];
-        var mouse = [];
+        if (cat.binds && cat.binds.length > 12 && cat.title.includes("OBSZARY ROBOCZE")) {
+          var switching = [], moving = [], mouse = [];
 
-        for (var j = 0; j < cat.binds.length; j++) {
-          var bind = cat.binds[j];
-          if (bind.keys.includes("MOUSE")) {
-            mouse.push(bind);
-          } else if (bind.desc.includes("Wyślij") || bind.desc.includes("wyślij")) {
-            moving.push(bind);
-          } else {
-            switching.push(bind);
+          for (var j = 0; j < cat.binds.length; j++) {
+            var bind = cat.binds[j];
+            if (bind.keys.includes("MOUSE")) {
+              mouse.push(bind);
+            } else if (bind.desc.includes("Send") || bind.desc.includes("send") ||
+                       bind.desc.includes("Move") || bind.desc.includes("move") ||
+                       bind.desc.includes("Wyślij") || bind.desc.includes("wyślij")) {
+              moving.push(bind);
+            } else {
+              switching.push(bind);
+            }
           }
-        }
 
-        if (switching.length > 0) {
-          result.push({
-            title: pluginApi?.tr("panel.workspace_switching") || "WORKSPACES - SWITCHING",
-            binds: switching
-          });
+          if (switching.length > 0) result.push({ title: "WORKSPACES - SWITCHING", binds: switching });
+          if (moving.length > 0) result.push({ title: "WORKSPACES - MOVING", binds: moving });
+          if (mouse.length > 0) result.push({ title: "WORKSPACES - MOUSE", binds: mouse });
+        } else {
+          result.push(cat);
         }
-        if (moving.length > 0) {
-          result.push({
-            title: pluginApi?.tr("panel.workspace_moving") || "WORKSPACES - MOVING",
-            binds: moving
-          });
-        }
-        if (mouse.length > 0) {
-          result.push({
-            title: pluginApi?.tr("panel.workspace_mouse") || "WORKSPACES - MOUSE",
-            binds: mouse
-          });
-        }
-      } else {
-        result.push(cat);
       }
+      return result;
     }
 
-    return result;
+    return cats;
   }
 
   function distributeCategories() {
-    // Oblicz wagę każdej kategorii (nagłówek + bindy + spacer)
-    var weights = [];
-    var totalWeight = 0;
+    var numCols = root.columnCount;
+
+    // Calculate weights for each category
+    var catData = [];
     for (var i = 0; i < categories.length; i++) {
       var weight = 1 + categories[i].binds.length + 1; // header + binds + spacer
-      weights.push(weight);
-      totalWeight += weight;
+      catData.push({ index: i, weight: weight });
     }
 
-    var targetPerColumn = totalWeight / 3;
-    var columns = [[], [], []];
-    var columnWeights = [0, 0, 0];
+    // Sort by weight descending (largest categories first for better distribution)
+    catData.sort(function(a, b) { return b.weight - a.weight; });
 
-    // Greedy algorithm: przypisz każdą kategorię do kolumny z najmniejszą wagą
-    for (var i = 0; i < categories.length; i++) {
+    var columns = [];
+    var columnWeights = [];
+    for (var c = 0; c < numCols; c++) {
+      columns.push([]);
+      columnWeights.push(0);
+    }
+
+    // Assign each category to the column with smallest current weight
+    for (var i = 0; i < catData.length; i++) {
       var minCol = 0;
-      for (var c = 1; c < 3; c++) {
+      for (var c = 1; c < numCols; c++) {
         if (columnWeights[c] < columnWeights[minCol]) {
           minCol = c;
         }
       }
-      columns[minCol].push(i);
-      columnWeights[minCol] += weights[i];
+      columns[minCol].push(catData[i].index);
+      columnWeights[minCol] += catData[i].weight;
+    }
+
+    // Sort categories within each column by original order for consistent display
+    for (var c = 0; c < numCols; c++) {
+      columns[c].sort(function(a, b) { return a - b; });
     }
 
     return columns;

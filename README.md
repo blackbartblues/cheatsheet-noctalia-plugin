@@ -175,7 +175,7 @@ The plugin follows `source` (Hyprland) and `include` (Niri) directives automatic
 
 ## Requirements
 
-- Noctalia Shell 3.6.0+
+- Noctalia Shell 4.1.0+
 - Hyprland or Niri compositor
 
 ## License

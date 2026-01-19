@@ -126,56 +126,15 @@ Item {
                         color: Color.mOnSurfaceVariant
                     }
 
-                    Slider {
+                    NSlider {
                         id: thresholdSlider
                         Layout.fillWidth: true
-                        implicitHeight: 24
                         from: 40
                         to: 100
                         stepSize: 5
                         value: service.currentThreshold
                         enabled: service.isWritable
-                        live: true
-
-                        background: Rectangle {
-                            x: thresholdSlider.leftPadding
-                            y: thresholdSlider.topPadding
-                               + thresholdSlider.availableHeight / 2 - height / 2
-                            width: thresholdSlider.availableWidth
-                            height: 6
-                            radius: 3
-                            color: Color.mSurfaceVariant
-
-                            Rectangle {
-                                width: thresholdSlider.visualPosition * parent.width
-                                height: parent.height
-                                radius: 3
-                                color: thresholdSlider.enabled ? Color.mPrimary : Color.mOutline
-                            }
-                        }
-
-                        handle: Rectangle {
-                            x: thresholdSlider.leftPadding + thresholdSlider.visualPosition
-                               * (thresholdSlider.availableWidth - width)
-                            y: thresholdSlider.topPadding
-                               + thresholdSlider.availableHeight / 2 - height / 2
-                            implicitWidth: 20
-                            implicitHeight: 20
-                            radius: 10
-                            color: thresholdSlider.pressed ? Color.mOnSurfaceVariant : (thresholdSlider.enabled ? Color.mPrimary : Color.mOutline)
-                            border.color: thresholdSlider.enabled ? Color.mOnPrimary : Color.mOutline
-                            border.width: 2
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
-                        }
-
-                        onMoved: {
-                            root.writeThreshold(Math.round(value))
-                        }
+                        onValueChanged: root.writeThreshold(Math.round(value))
                     }
 
                     NText {

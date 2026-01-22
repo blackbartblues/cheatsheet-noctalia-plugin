@@ -21,6 +21,21 @@ Item {
 
   readonly property bool panelReady: pluginApi !== null && mainInstance !== null && mainInstance !== undefined
 
+  readonly property var sortedPeerList: {
+    if (!mainInstance?.peerList) return []
+    var peers = mainInstance.peerList.slice()
+    peers.sort(function(a, b) {
+      // Online peers first
+      if (a.Online && !b.Online) return -1
+      if (!a.Online && b.Online) return 1
+      // Then alphabetically by hostname
+      var nameA = (a.HostName || a.DNSName || "").toLowerCase()
+      var nameB = (b.HostName || b.DNSName || "").toLowerCase()
+      return nameA.localeCompare(nameB)
+    })
+    return peers
+  }
+
   property real contentPreferredWidth: panelReady ? 400 * Style.uiScaleRatio : 0
   property real contentPreferredHeight: panelReady ? Math.min(500, 100 + (mainInstance?.peerList?.length || 0) * 60) * Style.uiScaleRatio : 0
 
@@ -104,7 +119,7 @@ Item {
               spacing: Style.marginS
 
               Repeater {
-                model: mainInstance?.peerList || []
+                model: sortedPeerList
 
                 delegate: Rectangle {
                   width: peerFlickable.width

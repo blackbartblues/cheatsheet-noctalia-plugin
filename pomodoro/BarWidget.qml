@@ -35,7 +35,6 @@ Rectangle {
   readonly property string barPosition: Settings.data.bar.position || "top"
   readonly property bool barIsVertical: barPosition === "left" || barPosition === "right"
 
-
   color: {
   if (mouseArea.containsMouse &&
       (!mainInstance || (!mainInstance.pomodoroRunning && !mainInstance.pomodoroSoundPlaying)))

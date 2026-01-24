@@ -203,10 +203,6 @@ Item {
     toggleProcess.running = true
   }
 
-  function openTaildropWindow() {
-    taildropWindow.visible = true
-  }
-
   Timer {
     id: updateTimer
     interval: refreshInterval
@@ -225,11 +221,6 @@ Item {
 
   Component.onCompleted: {
     checkTailscaleInstalled()
-  }
-
-  TaildropWindow {
-    id: taildropWindow
-    pluginApi: root.pluginApi
   }
 
   IpcHandler {
@@ -251,10 +242,6 @@ Item {
 
     function refresh() {
       updateTailscaleStatus()
-    }
-
-    function openTaildrop() {
-      taildropWindow.visible = true
     }
   }
 }

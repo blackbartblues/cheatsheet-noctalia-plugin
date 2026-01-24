@@ -262,7 +262,7 @@ Item {
           NText {
             Layout.fillWidth: true
             text: mainInstance?.tailscaleIp || ""
-            visible: mainInstance?.tailscaleRunning && mainInstance?.tailscaleIp
+            visible: (mainInstance?.tailscaleRunning ?? false) && (mainInstance?.tailscaleIp ?? false)
             pointSize: Style.fontSizeS
             color: mainIpMouseArea.containsMouse ? Color.mPrimary : Color.mOnSurfaceVariant
             font.family: Settings.data.ui.fontFixed
@@ -383,7 +383,7 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
             color: Qt.alpha(Color.mOnSurface, 0.1)
-            visible: mainInstance?.tailscaleRunning && mainInstance?.peerList && mainInstance.peerList.length > 0
+            visible: (mainInstance?.tailscaleRunning ?? false) && (mainInstance?.peerList?.length ?? 0) > 0
           }
 
           Flickable {
@@ -474,7 +474,7 @@ Item {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: Style.marginL
                 text: pluginApi?.tr("panel.no-peers") || "No connected peers"
-                visible: !mainInstance?.tailscaleRunning || !mainInstance?.peerList || mainInstance.peerList.length === 0
+                visible: !(mainInstance?.tailscaleRunning ?? false) || (mainInstance?.peerList?.length ?? 0) === 0
                 pointSize: Style.fontSizeM
                 color: Color.mOnSurfaceVariant
                 horizontalAlignment: Text.AlignHCenter
@@ -486,19 +486,7 @@ Item {
 
       NButton {
         Layout.fillWidth: true
-        visible: mainInstance?.tailscaleRunning && sortedPeerList.length > 0
-        text: pluginApi?.tr("panel.send-files") || "Send Files"
-        icon: "send"
-        onClicked: {
-          if (mainInstance) {
-            mainInstance.openTaildropWindow()
-          }
-        }
-      }
-
-      NButton {
-        Layout.fillWidth: true
-        visible: mainInstance?.tailscaleRunning
+        visible: mainInstance?.tailscaleRunning ?? false
         text: pluginApi?.tr("panel.admin-console") || "Admin Console"
         icon: "external-link"
         onClicked: {
@@ -514,7 +502,7 @@ Item {
         icon: mainInstance?.tailscaleRunning ? "plug-x" : "plug"
         backgroundColor: mainInstance?.tailscaleRunning ? Color.mError : Color.mPrimary
         textColor: mainInstance?.tailscaleRunning ? Color.mOnError : Color.mOnPrimary
-        enabled: mainInstance?.tailscaleInstalled
+        enabled: mainInstance?.tailscaleInstalled ?? false
         onClicked: {
           if (mainInstance) {
             mainInstance.toggleTailscale()

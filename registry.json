@@ -184,7 +184,7 @@
     {
       "id": "keybind-cheatsheet",
       "name": "Keybind Cheatsheet",
-      "version": "1.4.2",
+      "version": "2.1.0",
       "official": false,
       "author": "blacku",
       "description": "Universal keyboard shortcuts cheatsheet that automatically detects and displays keybindings for Hyprland or Niri compositors.",
@@ -192,7 +192,7 @@
       "minNoctaliaVersion": "4.1.2",
       "license": "MIT",
       "tags": [],
-      "lastUpdated": "2026-01-25T13:37:28-05:00"
+      "lastUpdated": "2026-01-25T14:38:53-05:00"
     },
     {
       "id": "mangowc-layout-switcher",

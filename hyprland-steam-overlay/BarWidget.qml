@@ -5,7 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Widgets
 
-Item {
+Rectangle {
   id: root
 
   property var pluginApi: null
@@ -13,17 +13,16 @@ Item {
   property string widgetId: ""
   property string section: ""
 
-  readonly property string barPosition: Settings.getBarPositionForScreen(screen.name)
-  readonly property bool barIsVertical: barPosition === "left" || barPosition === "right"
+  implicitWidth: barIsVertical ? Style.capsuleHeight : contentRow.implicitWidth + Style.marginM * 2
+  implicitHeight: Style.capsuleHeight
 
-  property bool hasNewMessages: pluginApi?.pluginSettings?.hasNewMessages || false
   property bool steamRunning: false
 
-  readonly property real contentWidth: barIsVertical ? Style.getCapsuleHeightForScreen(screen.name) : contentRow.implicitWidth + Style.marginM * 2
-  readonly property real contentHeight: Style.getCapsuleHeightForScreen(screen.name)
+  readonly property string barPosition: Settings.data.bar.position || "top"
+  readonly property bool barIsVertical: barPosition === "left" || barPosition === "right"
 
-  implicitWidth: contentWidth
-  implicitHeight: contentHeight
+  color: Style.capsuleColor
+  radius: Style.radiusL
 
   // Process to check Steam status
   Process {
@@ -34,6 +33,13 @@ Item {
     onExited: (exitCode, exitStatus) => {
       steamRunning = (exitCode === 0);
     }
+  }
+
+  // IPC Process to toggle overlay
+  Process {
+    id: ipcProcess
+    command: ["qs", "-p", Quickshell.shellDir, "ipc", "call", "plugin:hyprland-steam-overlay", "toggle"]
+    running: false
   }
 
   // Update steam status periodically
@@ -50,105 +56,15 @@ Item {
     checkSteamProcess.running = true;
   }
 
-  Rectangle {
-    id: visualCapsule
-    x: Style.pixelAlignCenter(parent.width, width)
-    y: Style.pixelAlignCenter(parent.height, height)
-    width: root.contentWidth
-    height: root.contentHeight
-    color: mouseArea.containsMouse ? Color.mHover : Style.capsuleColor
-    radius: Style.radiusL
+  RowLayout {
+    id: contentRow
+    anchors.centerIn: parent
+    spacing: Style.marginS
 
-    RowLayout {
-      id: contentRow
-      anchors.centerIn: parent
-      spacing: Style.marginS
-
-      Item {
-        implicitWidth: 24
-        implicitHeight: 24
-
-        // Steam icon - using stacked rectangles to create Steam-like logo
-        Item {
-          id: steamIcon
-          anchors.centerIn: parent
-          width: 20
-          height: 20
-
-          // Simple Steam-inspired icon using rectangles
-          Rectangle {
-            anchors.centerIn: parent
-            width: 20
-            height: 20
-            color: "transparent"
-            border.color: steamRunning ? Color.mPrimary : (mouseArea.containsMouse ? Color.mOnHover : Color.mOnSurface)
-            border.width: 2
-            radius: 10
-
-            // Inner circles for Steam logo effect
-            Rectangle {
-              anchors.centerIn: parent
-              anchors.horizontalCenterOffset: -4
-              anchors.verticalCenterOffset: 2
-              width: 6
-              height: 6
-              radius: 3
-              color: steamRunning ? Color.mPrimary : (mouseArea.containsMouse ? Color.mOnHover : Color.mOnSurface)
-            }
-
-            Rectangle {
-              anchors.centerIn: parent
-              anchors.horizontalCenterOffset: 4
-              anchors.verticalCenterOffset: 2
-              width: 4
-              height: 4
-              radius: 2
-              color: steamRunning ? Color.mPrimary : (mouseArea.containsMouse ? Color.mOnHover : Color.mOnSurface)
-            }
-
-            Rectangle {
-              anchors.top: parent.top
-              anchors.horizontalCenter: parent.horizontalCenter
-              anchors.topMargin: 4
-              width: 8
-              height: 8
-              radius: 4
-              color: steamRunning ? Color.mPrimary : (mouseArea.containsMouse ? Color.mOnHover : Color.mOnSurface)
-            }
-          }
-
-          // Notification dot
-          Rectangle {
-            visible: hasNewMessages
-            anchors.top: parent.top
-            anchors.right: parent.right
-            width: 8
-            height: 8
-            radius: 4
-            color: "#F44336"
-            border.color: Color.mSurface
-            border.width: 1
-
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: hasNewMessages
-
-              NumberAnimation {
-                from: 1.0
-                to: 0.3
-                duration: 800
-                easing.type: Easing.InOutQuad
-              }
-              NumberAnimation {
-                from: 0.3
-                to: 1.0
-                duration: 800
-                easing.type: Easing.InOutQuad
-              }
-            }
-          }
-        }
-      }
+    NIcon {
+      icon: "brand-steam"
+      pointSize: Style.fontSizeL
+      color: steamRunning ? Color.mPrimary : (mouseArea.containsMouse ? Color.mOnHover : Color.mOnSurface)
     }
   }
 
@@ -158,11 +74,18 @@ Item {
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
 
+    onEntered: {
+      root.color = Color.mHover;
+    }
+
+    onExited: {
+      root.color = Style.capsuleColor;
+    }
+
     onClicked: {
       if (pluginApi) {
         Logger.i("SteamOverlay.BarWidget: Calling Steam overlay toggle");
-        // Call toggle via IPC
-        toggleProcess.running = true;
+        ipcProcess.running = true;
       }
     }
   }
